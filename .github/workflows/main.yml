@@ -1,0 +1,69 @@
+name: Distributed Load Test
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  start_master:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      
+    - name: Set up JDK
+      uses: actions/setup-java@v1
+      with:
+        java-version: '11'
+      
+    - name: Start JMeter Master
+      run: |
+        docker run --name jmeter-master -d -v $(pwd):/tests -w /tests justb4/jmeter:latest \
+          -n -t ./Demo.jmx -R${{ job.services.jmeter_slave.outputs.IP }} \
+          -l results.jtl -e -o report
+        
+  start_slave:
+    runs-on: ubuntu-latest
+    needs: start_master
+    services:
+      jmeter_slave:
+        image: justb4/jmeter:latest
+        options: --name jmeter-slave --entrypoint "jmeter-server"
+        ports:
+          - 1099/tcp
+          - 50000/tcp
+    steps:
+    - name: Get Slave IP
+      id: get_ip
+      run: echo "::set-output name=IP::$(echo ${{ job.services.jmeter_slave }} | jq -r '.containers[0].ip')"
+
+  analyze_results:
+    needs: start_master
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      
+    - name: Set up JDK
+      uses: actions/setup-java@v1
+      with:
+        java-version: '11'
+      
+    - name: Download JMeter results
+      uses: actions/download-artifact@v2
+      with:
+        name: jmeter-results
+        path: ./results
+        
+    - name: Upload JMeter report as artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: jmeter-report
+        path: ./results/report
+        
+    - name: View JMeter report
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./results/report

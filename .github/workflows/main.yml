@@ -6,58 +6,40 @@ on:
       - main  # Adjust as per your main branch name
 
 jobs:
-  provision_and_test:
+  load_test:
     runs-on: ubuntu-latest  # Use an appropriate runner, adjust as needed
+
+    strategy:
+      matrix:
+        worker-node: [worker1, worker2, worker3]  # Adjust with actual worker node names
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Set up JMeter
-        uses: appveyor/jmeter-actions@v2
+      - name: Set up Java
+        uses: actions/setup-java@v2
         with:
-          jmeter-version: '5.4.3'  # Adjust with your JMeter version
+          java-version: '11'  # Adjust with the Java version required by JMeter
 
-      - name: Provision and configure worker nodes
-        id: provision-nodes
+      - name: Download Apache JMeter
         run: |
-          # Example script to launch worker nodes and configure them
-          # Replace this with your actual provisioning and configuration logic
-          
-          # For demonstration, let's assume a simple script to launch Docker containers as worker nodes
-          # Replace this with your actual provisioning script (e.g., using cloud provider APIs)
+          wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.4.3.tgz
+          tar -xf apache-jmeter-5.4.3.tgz
 
-          # Launch Docker containers as worker nodes
-          docker run -d --name worker1 jmeter-worker
-          docker run -d --name worker2 jmeter-worker
-          docker run -d --name worker3 jmeter-worker
-
-          # Wait for nodes to start (replace with appropriate wait logic)
-          sleep 30
-
-          # Get IP addresses of the worker nodes
-          WORKER1_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' worker1)
-          WORKER2_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' worker2)
-          WORKER3_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' worker3)
-
-          # Set environment variables for remote workers
-          echo "::set-env name=REMOTE_WORKERS::$WORKER1_IP,$WORKER2_IP,$WORKER3_IP"
-          echo "::set-env name=JMETER_WORKERS::3"
+      - name: Configure workers
+        run: |
+          echo "::set-env name=REMOTE_WORKERS::worker1,worker2,worker3"  # Update with your worker nodes
+          echo "::set-env name=JMETER_WORKERS::3"  # Number of worker nodes
 
       - name: Run distributed load test
         run: |
-          jmeter -n -t Demo.jmx \
-                 -R ${{ env.REMOTE_WORKERS }} \
-                 -l results.jtl
+          apache-jmeter-5.4.3/bin/jmeter -n -t path/to/your/test-plan.jmx \
+                                        -R ${{ env.REMOTE_WORKERS }} \
+                                        -l results.jtl
 
       - name: Upload test results
         uses: actions/upload-artifact@v2
         with:
           name: LoadTestResults
           path: results.jtl
-
-      - name: Clean up worker nodes
-        run: |
-          # Example script to stop and remove worker nodes
-          docker stop worker1 worker2 worker3
-          docker rm worker1 worker2 worker3

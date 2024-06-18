@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  jmeter-master:
+    image: justb4/jmeter:latest
+    ports:
+      - "60000:60000"
+    volumes:
+      - ./jmeter/test-scripts:/jmeter/test-scripts
+    command: -n -t /jmeter/test-scripts/Demo.jmx -Djava.rmi.server.hostname=jmeter-master -Dserver.rmi.ssl.disable=true
+
+  jmeter-slave:
+    image: justb4/jmeter:latest
+    environment:
+      - JMETER_MASTER_HOST=jmeter-master
+    command: -Jclient.rmi.localport=60000 -s -j /jmeter/logs/jmeter-slave.log

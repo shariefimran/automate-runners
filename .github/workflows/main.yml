@@ -23,8 +23,8 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
       
-    - name: Set up JDK 11
-      uses: actions/setup-java@v2
+    - name: Set up JDK
+      uses: actions/setup-java@v1
       with:
         java-version: '11'
       
@@ -35,13 +35,16 @@ jobs:
       run: |
         docker run --name jmeter-master -v $(pwd):/tests -w /tests justb4/jmeter:latest \
           -n -t /tests/Demo.jmx -R${{ needs.start_slave.outputs.get_ip.IP }} \
-          -l /tests/results/results.jtl -e -o /tests/results/report
+          -l /tests/results/results.jtl -e -o /tests/results/report || true
+        
+    - name: List Results Directory for Debugging
+      run: ls -l results
 
     - name: Upload JMeter results as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v2
       with:
         name: jmeter-results
-        path:./results
+        path: ./results
 
   analyze_results:
     runs-on: ubuntu-latest
@@ -50,22 +53,25 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
       
-    - name: Set up JDK 11
-      uses: actions/setup-java@v2
+    - name: Set up JDK
+      uses: actions/setup-java@v1
       with:
         java-version: '11'
       
     - name: Download JMeter results
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v2
       with:
         name: jmeter-results
-        path:./results
+        path: ./results
         
-    - name: Create new branch for results
-      run: git checkout -b load-test-results-${GITHUB_RUN_ID}
-      
-    - name: Commit and push results
-      run: |
-        git add.
-        git commit -m "Load test results for ${GITHUB_RUN_ID}"
-        git push origin load-test-results-${GITHUB_RUN_ID}
+    - name: Upload JMeter report as artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: jmeter-report
+        path: ./results/report
+        
+    - name: View JMeter report
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./results/report

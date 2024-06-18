@@ -1,49 +1,61 @@
-name: Distributed Load Testing
+name: Distributed Load Testing with JMeter
 
 on:
   push:
     branches:
-      - main  # Adjust as per your main branch name
+      - main  # Trigger on push to main branch
+  pull_request:
+    branches:
+      - main  # Trigger on pull request to main branch
 
 jobs:
-  load_test:
-    runs-on: ubuntu-latest  # Use an appropriate runner, adjust as needed
+  load_testing:
+    runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        worker-node: [worker1, worker2, worker3]  # Adjust with actual worker node names
+    services:
+      docker:
+        image: docker:latest
+        options: --privileged  # Required for Docker-in-Docker setup
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up Java
-        uses: actions/setup-java@v2
-        with:
-          java-version: '11'  # Adjust with the Java version required by JMeter
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
 
-      - name: Download Apache JMeter
+      - name: Pull JMeter Docker image
+        run: docker pull justb4/jmeter:latest
+
+      - name: Start JMeter master container
         run: |
-          wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.4.3.tgz
-          tar -xf apache-jmeter-5.4.3.tgz
+          docker run -d --name jmeter-master \
+            -v ${{ github.workspace }}/jmeter/test-scripts:/jmeter/test-scripts \
+            -p 60000:60000 \
+            justb4/jmeter:latest \
+            -n -t Demo.jmx -R jmeter-slave
 
-      - name: Configure workers
+      - name: Start JMeter slave container
         run: |
-          echo "worker1" > worker_ips.txt  # Example: Replace with IPs or hostnames of your worker nodes
-          echo "worker2" >> worker_ips.txt
-          echo "worker3" >> worker_ips.txt
-          echo "worker4" >> worker_ips.txt  # Add more as needed
-          echo "::set-env name=REMOTE_WORKERS::$(cat worker_ips.txt | tr '\n' ',')"  # Set REMOTE_WORKERS env var
-          echo "::set-env name=JMETER_WORKERS::$(cat worker_ips.txt | wc -l)"  # Set JMETER_WORKERS count
+          docker run -d --name jmeter-slave \
+            --link jmeter-master \
+            -e JMETER_MASTER_HOST=jmeter-master \
+            justb4/jmeter:latest \
+            -s
 
-      - name: Run distributed load test
+      - name: Wait for containers to start
+        run: sleep 30  # Adjust as necessary based on your test setup
+
+      - name: Run JMeter load test
+        run: docker exec -i jmeter-master jmeter -n -t /jmeter/test-scripts/your_test_script.jmx
+
+      - name: Retrieve JMeter logs
+        run: docker logs jmeter-master
+
+      - name: Stop and remove containers
         run: |
-          apache-jmeter-5.4.3/bin/jmeter -n -t path/to/your/test-plan.jmx \
-                                        -R ${{ env.REMOTE_WORKERS }} \
-                                        -l results.jtl
+          docker stop jmeter-master
+          docker stop jmeter-slave
+          docker rm jmeter-master
+          docker rm jmeter-slave
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v2
-        with:
-          name: LoadTestResults
-          path: results.jtl

@@ -33,9 +33,19 @@ jobs:
               justb4/jmeter:latest
           done
 
+      - name: Check Master Node Status
+        run: |
+          echo "Master Node Status before start:"
+          docker ps -a | grep jmeter-master
+
       - name: Start Master Node
         run: |
           docker start jmeter-master
+
+      - name: Check Master Node Status after start
+        run: |
+          echo "Master Node Status after start:"
+          docker ps -a | grep jmeter-master
 
       - name: Run JMeter Test
         run: |

@@ -31,7 +31,7 @@ jobs:
     - name: Run JMeter Test (No Results Storage)
       run: |
         docker run --name jmeter-master -v $(pwd):/tests -w /tests justb4/jmeter:latest \
-          -n -t /tests/Demo.jmx -R${{ needs.start_slave.outputs.get_ip.IP }}
+          -n -t /tests/Demo.jmx ${{ needs.start_slave.outputs.get_ip.IP }}
 
     - name: Check if JMeter Test Completed
       run: docker logs jmeter-master

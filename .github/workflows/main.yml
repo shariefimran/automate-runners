@@ -30,9 +30,10 @@ jobs:
       
     - name: Start JMeter Master
       run: |
-        docker run --name jmeter-master -d -v $(pwd):/tests -w /tests justb4/jmeter:latest \
+        mkdir -p results
+        docker run --name jmeter-master -v $(pwd):/tests -w /tests justb4/jmeter:latest \
           -n -t ./Demo.jmx -R${{ needs.start_slave.outputs.get_ip.IP }} \
-          -l results.jtl -e -o report
+          -l /tests/results/results.jtl -e -o /tests/results/report
 
     - name: Upload JMeter results as artifact
       uses: actions/upload-artifact@v2

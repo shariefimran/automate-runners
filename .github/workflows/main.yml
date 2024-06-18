@@ -21,7 +21,7 @@ jobs:
           docker run -d --name jmeter-master \
             -p 1099:1099 \
             -v $(pwd)/jmeter-master.properties:/opt/jmeter-master.properties \
-            justb4/jmeter:5.4.1
+            justb4/jmeter:latest
 
       - name: Launch Slave Nodes
         run: |
@@ -29,7 +29,7 @@ jobs:
             docker run -d --name jmeter-slave-$i \
               -p 1099:1099 \
               -v $(pwd)/jmeter-slave.properties:/opt/jmeter-slave.properties \
-              justb4/jmeter:5.4.1
+              justb4/jmeter:latest
           done
 
       - name: Run JMeter Test

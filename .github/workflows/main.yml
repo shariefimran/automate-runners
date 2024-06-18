@@ -1,65 +1,91 @@
-name: Distributed Load Testing with JMeter (Dockerized)
 
-on:
+name: Distributed JMeter Load Testing
+
+on: 
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
-  load-testing:
+  setup-slaves:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        slave: [1, 2, 3, 4]  # Number of slave instances you want to run
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Launch Master Node
+      - name: Install JMeter
         run: |
-          docker run -d --name jmeter-master \
-            -p 1099:1099 \
-            -v $(pwd):/opt/apache-jmeter-5.5/ \
-            justb4/jmeter:latest
+          sudo apt-get update
+          sudo apt-get install -y openjdk-11-jre
+          wget https://downloads.apache.org//jmeter/binaries/apache-jmeter-5.5.tgz
+          tar -xzf apache-jmeter-5.5.tgz
+          export JMETER_HOME=$PWD/apache-jmeter-5.5
+          export PATH=$PATH:$JMETER_HOME/bin
 
-      - name: Launch Slave Nodes
+      - name: Setup JMeter Slave
         run: |
-          for i in {1..3}; do
-            PORT=$(shuf -i 1025-65535 -n 1)
-            docker run -d --name jmeter-slave-$i \
-              -p $PORT:1099 \
-              -v $(pwd):/opt/apache-jmeter-5.5/ \
-              justb4/jmeter:latest
-          done
+          echo "Setting up JMeter slave runner-${{ matrix.slave }}"
+          nohup jmeter-server -Dserver.rmi.localport=50000 -Dserver_port=1099 > slave-${{ matrix.slave }}.log 2>&1 &
 
-      - name: Check Master Node Status
+  setup-master:
+    runs-on: ubuntu-latest
+    needs: setup-slaves
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install JMeter
         run: |
-          echo "Master Node Status before start:"
-          docker ps -a | grep jmeter-master
+          sudo apt-get update
+          sudo apt-get install -y openjdk-11-jre
+          wget https://downloads.apache.org//jmeter/binaries/apache-jmeter-5.5.tgz
+          tar -xzf apache-jmeter-5.5.tgz
+          export JMETER_HOME=$PWD/apache-jmeter-5.5
+          export PATH=$PATH:$JMETER_HOME/bin
 
-      - name: Start Master Node
+      - name: Configure JMeter Master
         run: |
-          docker start jmeter-master
+          echo "Setting up JMeter master runner"
+          # Create a properties file to configure the slaves
+          echo "remote_hosts=$(for i in {1..4}; do echo runner-$i; done | paste -sd, -)" > $JMETER_HOME/bin/user.properties
 
-      - name: Check Master Node Status after start
+  run-load-test:
+    runs-on: ubuntu-latest
+    needs: setup-master
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run JMeter Load Test
         run: |
-          echo "Master Node Status after start:"
-          docker ps -a | grep jmeter-master
+          export JMETER_HOME=$PWD/apache-jmeter-5.5
+          export PATH=$PATH:$JMETER_HOME/bin
+          echo "Running JMeter load test"
+          jmeter -n -t Demo.jmx -r
 
-      - name: Run JMeter Test
+  collect-results:
+    runs-on: ubuntu-latest
+    needs: run-load-test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Collect JMeter Load Test Results
         run: |
-          docker exec jmeter-master jmeter -n -t Demo.jmx -l results.jtl -R 1099
+          echo "Collecting results"
+          mkdir -p results
+          mv $JMETER_HOME/bin/*.jtl results/
 
-      - name: Upload Results
-        uses: actions/upload-artifact@v2
+      - name: Upload JMeter Load Test Results
+        uses: actions/upload-artifact@v3
         with:
-          name: results
-          path: results.jtl
-
-      - name: Stop JMeter Nodes
-        run: |
-          docker stop jmeter-master
-          for i in {1..3}; do
-            docker stop jmeter-slave-$i
-          done
+          name: load-test-results
+          path: ./results

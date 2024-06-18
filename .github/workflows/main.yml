@@ -41,7 +41,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: jmeter-results
-        path: ./results
+        path:./results
 
   analyze_results:
     runs-on: ubuntu-latest
@@ -59,16 +59,13 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: jmeter-results
-        path: ./results
+        path:./results
         
-    - name: Upload JMeter report as artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: jmeter-report
-        path: ./results/report
-        
-    - name: View JMeter report
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./results/report
+    - name: Create new branch for results
+      run: git checkout -b load-test-results-${GITHUB_RUN_ID}
+      
+    - name: Commit and push results
+      run: |
+        git add.
+        git commit -m "Load test results for ${GITHUB_RUN_ID}"
+        git push origin load-test-results-${GITHUB_RUN_ID}

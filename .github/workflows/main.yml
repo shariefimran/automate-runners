@@ -29,8 +29,12 @@ jobs:
 
       - name: Configure workers
         run: |
-          echo "::set-env name=REMOTE_WORKERS::worker1,worker2,worker3"  # Update with your worker nodes
-          echo "::set-env name=JMETER_WORKERS::3"  # Number of worker nodes
+          echo "worker1" > worker_ips.txt  # Example: Replace with IPs or hostnames of your worker nodes
+          echo "worker2" >> worker_ips.txt
+          echo "worker3" >> worker_ips.txt
+          echo "worker4" >> worker_ips.txt  # Add more as needed
+          echo "::set-env name=REMOTE_WORKERS::$(cat worker_ips.txt | tr '\n' ',')"  # Set REMOTE_WORKERS env var
+          echo "::set-env name=JMETER_WORKERS::$(cat worker_ips.txt | wc -l)"  # Set JMETER_WORKERS count
 
       - name: Run distributed load test
         run: |

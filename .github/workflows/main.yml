@@ -33,7 +33,7 @@ jobs:
             -v ${{ github.workspace }}/jmeter/test-scripts:/jmeter/test-scripts \
             -p 60000:60000 \
             justb4/jmeter:latest \
-            -n -t Demo.jmx -R jmeter-slave
+            -n -t /Demo.jmx -R jmeter-slave
 
       - name: Start JMeter slave container
         run: |

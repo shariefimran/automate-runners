@@ -27,42 +27,16 @@ jobs:
       - name: Pull JMeter Docker image
         run: docker pull justb4/jmeter:latest
 
-      - name: Start JMeter master container
-        id: start_master
+      - name: Start JMeter master and slave containers
         run: |
-          docker run -d --name jmeter-master \
-            -v ${{ github.workspace }}/jmeter/test-scripts:/jmeter/test-scripts \
-            -p 60000:60000 \
-            justb4/jmeter:latest \
-            -n -t /jmeter/test-scripts/Demo.jmx -Djava.rmi.server.hostname=jmeter-master -Dserver.rmi.ssl.disable=true
-
-      - name: Wait for master to start
-        run: sleep 20  # Adjust as necessary based on your test setup
-
-      - name: Get master container IP
-        id: master_ip
-        run: echo "::set-output name=ip::$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' jmeter-master)"
-
-      - name: Start JMeter slave container
-        run: |
-          docker run -d --name jmeter-slave \
-            -e JMETER_MASTER_IP=${{ steps.master_ip.outputs.ip }} \
-            justb4/jmeter:latest \
-            -Jclient.rmi.localport=60000 -s -j /jmeter/logs/jmeter-slave.log
-
-      - name: Wait for slave to start
-        run: sleep 20  # Adjust as necessary based on your test setup
+          docker-compose -f docker-compose.yml up -d
+          sleep 30  # Adjust as necessary based on your test setup
 
       - name: Run JMeter load test
-        run: docker exec -i jmeter-master jmeter -n -t /jmeter/test-scripts/your_test_script.jmx -R${{ steps.master_ip.outputs.ip }}
+        run: docker exec -i jmeter-master jmeter -n -t /jmeter/test-scripts/Demo.jmx -R jmeter-slave
 
       - name: Retrieve JMeter logs
         run: docker logs jmeter-master
 
       - name: Stop and remove containers
-        run: |
-          docker stop jmeter-master
-          docker stop jmeter-slave
-          docker rm jmeter-master
-          docker rm jmeter-slave
-
+        run: docker-compose -f docker-compose.yml down

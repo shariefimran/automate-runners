@@ -26,8 +26,9 @@ jobs:
       - name: Launch Slave Nodes
         run: |
           for i in {1..3}; do
+            PORT=$(shuf -i 1025-65535 -n 1)
             docker run -d --name jmeter-slave-$i \
-              -p 10$i9:1099 \
+              -p $PORT:1099 \
               -v $(pwd)/jmeter-slave.properties:/opt/jmeter-slave.properties \
               justb4/jmeter:latest
           done

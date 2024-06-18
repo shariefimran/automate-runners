@@ -8,79 +8,64 @@ on:
 jobs:
   start_slave:
     runs-on: ubuntu-latest
-    container:
-      image: justb4/jmeter:latest
-      options: --entrypoint "jmeter-server"
     steps:
-    - name: Get Slave IP
-      id: get_ip
-      run: echo "::set-output name=IP::$(hostname -I | awk '{print $1}')"
+      - name: Start JMeter Slave
+        run: |
+          docker run --name jmeter-slave -d --entrypoint "jmeter-server" justb4/jmeter:latest
+      - name: Get Slave IP
+        id: get_ip
+        run: |
+          echo "::set-output name=IP::$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' jmeter-slave)"
 
   start_master:
     runs-on: ubuntu-latest
     needs: start_slave
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    - name: Set up JDK
-      uses: actions/setup-java@v1
-      with:
-        java-version: '11'
+      - name: Checkout repository
+        uses: actions/checkout@v2
       
-    - name: Prepare Results Directory
-      run: mkdir -p results
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: '11'
+      
+      - name: Run JMeter Test
+        run: |
+          SLAVE_IP=$(echo "${{ needs.start_slave.outputs.IP }}")
+          docker run --name jmeter-master -v $(pwd):/tests -w /tests justb4/jmeter:latest \
+            -n -t /tests/Demo.jmx -R${SLAVE_IP}
 
-    - name: Start JMeter Master
-      run: |
-        # Retrieve the IP address of the JMeter slave
-        SLAVE_IP=$(echo "${{ needs.start_slave.outputs.get_ip.IP }}")
-        
-        # Run JMeter master with the retrieved IP of the slave
-        docker run --name jmeter-master -v $(pwd):/tests -w /tests justb4/jmeter:latest \
-          -n -t /tests/Demo.jmx -R"${SLAVE_IP}" \
-          -l /tests/results/results.jtl -e -o /tests/results/report || true
+      - name: Check if JMeter Test Completed
+        run: docker logs jmeter-master
 
-    - name: List Results Directory for Debugging
-      run: ls -l results
+      # Optional: Download results if needed
+      # - name: Download JMeter results
+      #   run: docker cp jmeter-master:/tests/results /github/workspace/results
 
-    - name: Commit and Push Results to `results` Branch
-      run: |
-        git config --global user.name 'github-actions'
-        git config --global user.email 'github-actions@github.com'
-        git checkout -b results || git checkout results
-        git add results/
-        git commit -m "Add JMeter test results"
-        git push origin results --force
+      # - name: Upload JMeter results as artifact
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: jmeter-results
+      #     path: ./results
 
   analyze_results:
     runs-on: ubuntu-latest
     needs: start_master
     steps:
-    - name: Checkout `results` Branch
-      uses: actions/checkout@v2
-      with:
-        ref: results
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: '11'
+      
+      # Placeholder for downloading and analyzing results
+      # - name: Download JMeter results (if needed)
+      #   run: echo "Downloading results..."
 
-    - name: Set up JDK
-      uses: actions/setup-java@v1
-      with:
-        java-version: '11'
+      # - name: Upload JMeter report as artifact (if needed)
+      #   run: echo "Uploading report..."
 
-    - name: Download JMeter results
-      uses: actions/download-artifact@v2
-      with:
-        name: jmeter-results
-        path: ./results
-        
-    - name: Upload JMeter report as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: jmeter-report
-        path: ./results/report
-        
-    - name: View JMeter report
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./results/report
+      # - name: View JMeter report (if needed)
+      #   run: echo "Viewing report..."

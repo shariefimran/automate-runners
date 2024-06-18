@@ -29,14 +29,20 @@ jobs:
 
       - name: Start JMeter master and slave containers
         run: |
-          docker-compose -f docker-compose.yml up -d
+          docker-compose -f ./docker-compose.yml up -d
           sleep 30  # Adjust as necessary based on your test setup
 
+      - name: Wait for containers to start
+        run: sleep 20
+
+      - name: List running containers
+        run: docker ps -a
+
       - name: Run JMeter load test
-        run: docker exec -i jmeter-master jmeter -n -t /jmeter/test-scripts/Demo.jmx -R jmeter-slave
+        run: docker exec -i jmeter-master jmeter -n -t /jmeter/test-scripts/your_test_script.jmx -R jmeter-slave
 
       - name: Retrieve JMeter logs
         run: docker logs jmeter-master
 
       - name: Stop and remove containers
-        run: docker-compose -f docker-compose.yml down
+        run: docker-compose -f ./docker-compose.yml down

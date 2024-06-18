@@ -33,6 +33,10 @@ jobs:
               justb4/jmeter:latest
           done
 
+      - name: Start Master Node
+        run: |
+          docker start jmeter-master
+
       - name: Run JMeter Test
         run: |
           docker exec jmeter-master jmeter -n -t Demo.jmx -l results.jtl -R 1099

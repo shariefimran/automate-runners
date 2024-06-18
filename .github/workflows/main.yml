@@ -6,8 +6,19 @@ on:
       - main
 
 jobs:
+  start_slave:
+    runs-on: ubuntu-latest
+    container:
+      image: justb4/jmeter:latest
+      options: --entrypoint "jmeter-server"
+    steps:
+    - name: Get Slave IP
+      id: get_ip
+      run: echo "::set-output name=IP::$(hostname -I | awk '{print $1}')"
+
   start_master:
     runs-on: ubuntu-latest
+    needs: start_slave
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -20,27 +31,18 @@ jobs:
     - name: Start JMeter Master
       run: |
         docker run --name jmeter-master -d -v $(pwd):/tests -w /tests justb4/jmeter:latest \
-          -n -t ./Demo.jmx -R${{ job.services.jmeter_slave.outputs.IP }} \
+          -n -t ./Demo.jmx -R${{ needs.start_slave.outputs.get_ip.IP }} \
           -l results.jtl -e -o report
-        
-  start_slave:
-    runs-on: ubuntu-latest
-    needs: start_master
-    services:
-      jmeter_slave:
-        image: justb4/jmeter:latest
-        options: --name jmeter-slave --entrypoint "jmeter-server"
-        ports:
-          - 1099/tcp
-          - 50000/tcp
-    steps:
-    - name: Get Slave IP
-      id: get_ip
-      run: echo "::set-output name=IP::$(echo ${{ job.services.jmeter_slave }} | jq -r '.containers[0].ip')"
+
+    - name: Upload JMeter results as artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: jmeter-results
+        path: ./results
 
   analyze_results:
-    needs: start_master
     runs-on: ubuntu-latest
+    needs: start_master
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2

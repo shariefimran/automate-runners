@@ -8,13 +8,13 @@ on:
 jobs:
   start_slave:
     runs-on: ubuntu-latest
-    container:
-      image: justb4/jmeter:latest
-      options: --entrypoint "jmeter-server"
     steps:
+    - name: Start JMeter Slave
+      run: |
+        docker run --name jmeter-slave -d --entrypoint "jmeter-server" justb4/jmeter:latest
     - name: Get Slave IP
       id: get_ip
-      run: echo "::set-output name=IP::$(hostname -I | awk '{print $1}')"
+      run: echo "::set-output name=IP::$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' jmeter-slave)"
 
   start_master:
     runs-on: ubuntu-latest

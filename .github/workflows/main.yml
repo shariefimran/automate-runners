@@ -28,23 +28,13 @@ jobs:
       with:
         java-version: '11'
       
-    - name: Prepare Results Directory
-      run: mkdir -p results
-
-    - name: Run JMeter Test and Store Results
+    - name: Run JMeter Test (No Results Storage)
       run: |
         docker run --name jmeter-master -v $(pwd):/tests -w /tests justb4/jmeter:latest \
-          -n -t /tests/Demo.jmx -R${{ needs.start_slave.outputs.get_ip.IP }} \
-          -l /tests/results/results.jtl -e -o /tests/results/report || true
+          -n -t /tests/Demo.jmx -R${{ needs.start_slave.outputs.get_ip.IP }}
 
-    - name: List Results Directory for Debugging
-      run: ls -l results
-
-    - name: Upload JMeter results as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: jmeter-results
-        path: ./results
+    - name: Check if JMeter Test Completed
+      run: docker logs jmeter-master
 
   analyze_results:
     runs-on: ubuntu-latest
@@ -58,20 +48,11 @@ jobs:
       with:
         java-version: '11'
       
-    - name: Download JMeter results
-      uses: actions/download-artifact@v2
-      with:
-        name: jmeter-results
-        path: ./results
+    - name: Download JMeter results (Skip for Now)
+      run: echo "Skipping results download for now."
         
-    - name: Upload JMeter report as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: jmeter-report
-        path: ./results/report
+    - name: Upload JMeter report as artifact (Skip for Now)
+      run: echo "Skipping report upload for now."
         
-    - name: View JMeter report
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./results/report
+    - name: View JMeter report (Skip for Now)
+      run: echo "Skipping report view for now."

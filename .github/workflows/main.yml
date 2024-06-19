@@ -87,6 +87,12 @@ jobs:
           echo "JMeter Slave started successfully"
         shell: bash
 
+      - name: Check if JMeter Slave is Listening on Port 1099
+        run: |
+          echo "Checking if JMeter Slave is listening on port 1099"
+          netstat -an | grep 1099 || (echo "JMeter Slave is not listening on port 1099" && cat jmeter-server.log && exit 1)
+        shell: bash
+
   run-master:
     runs-on: ubuntu-latest
     needs: start-slave
@@ -117,21 +123,18 @@ jobs:
         run: |
           echo "Waiting for JMeter Slave to start"
           sleep 60
-          echo "Checking if JMeter Slave is running"
-          netstat -an || (echo "netstat command failed" && exit 1)
-          netstat -an | grep 1099 || (echo "JMeter Slave is not listening on port 1099" && exit 1)
-          echo "JMeter Slave is listening on port 1099"
         shell: bash
 
       - name: Configure JMeter Master
         run: |
           echo "Configuring JMeter Master"
-          echo "remote_hosts=127.0.0.1:1099" >> $JMETER_HOME/bin/user.properties
+          SLAVE_IP=$(steps.get_ip.outputs.slave_ip)
+          echo "remote_hosts=${SLAVE_IP}:1099" >> $JMETER_HOME/bin/user.properties
         shell: bash
 
       - name: Run JMeter Test (Master)
         run: |
           echo "Running JMeter Test"
-          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R127.0.0.1:1099 -l test-results.jtl
+          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R${SLAVE_IP}:1099 -l test-results.jtl
           cat test-results.jtl
         shell: bash

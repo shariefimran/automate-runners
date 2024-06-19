@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [1, 2] # Define two nodes: 1 for master and 1 for slave
+        role: [master, slave] # Define roles: one master and one slave
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -20,33 +20,32 @@ jobs:
 
       - name: Download JMeter
         run: |
-          curl -L https://downloads.apache.org//jmeter/binaries/apache-jmeter-5.5.tgz > jmeter.tgz
+          curl -L https://downloads.apache.org//jmeter/binaries/apache-jmeter-5.5.tgz -o jmeter.tgz
           tar -xzf jmeter.tgz
           export JMETER_HOME=$(pwd)/apache-jmeter-5.5
           export PATH=$JMETER_HOME/bin:$PATH
 
       - name: Configure JMeter Slave
-        if: matrix.node == 2
+        if: matrix.role == 'slave'
         run: |
           echo "Configuring JMeter Slave"
-          echo "slave.runs-on=ubuntu-latest" > user.properties
+          echo "slave.runs-on=ubuntu-latest" > $JMETER_HOME/bin/user.properties
 
       - name: Start JMeter Server (Slave)
-        if: matrix.node == 2
+        if: matrix.role == 'slave'
         run: |
           echo "Starting JMeter in server mode"
-          nohup jmeter-server &
+          nohup $JMETER_HOME/bin/jmeter-server &
 
       - name: Configure JMeter Master
-        if: matrix.node == 1
+        if: matrix.role == 'master'
         run: |
           echo "Configuring JMeter Master"
           echo "remote_hosts=127.0.0.1" > $JMETER_HOME/bin/user.properties
-          echo "client.runs-on=ubuntu-latest" >> $JMETER_HOME/bin/user.properties
 
       - name: Run JMeter Test (Master)
-        if: matrix.node == 1
+        if: matrix.role == 'master'
         run: |
           echo "Running JMeter Test"
-          jmeter -n -t Demo.jmx -R127.0.0.1 -l test-results.jtl
+          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R127.0.0.1 -l test-results.jtl
           cat test-results.jtl

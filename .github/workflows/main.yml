@@ -43,6 +43,8 @@ jobs:
           echo "Starting JMeter in server mode"
           nohup $JMETER_HOME/bin/jmeter-server > jmeter-server.log 2>&1 &
           sleep 10
+          echo "JMeter Server Log:"
+          cat jmeter-server.log
           echo "Checking if JMeter Slave is running"
           pgrep -f jmeter-server || (echo "JMeter Slave failed to start" && exit 1)
           echo "JMeter Slave started successfully"
@@ -54,6 +56,7 @@ jobs:
           echo "Waiting for JMeter Slave to start"
           sleep 60
           echo "Checking if JMeter Slave is running"
+          netstat -an || (echo "netstat command failed" && exit 1)
           netstat -an | grep 1099 || (echo "JMeter Slave is not listening on port 1099" && exit 1)
           echo "JMeter Slave is listening on port 1099"
         shell: bash

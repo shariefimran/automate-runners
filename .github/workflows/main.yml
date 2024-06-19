@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        role: [master, slave] # Define roles: one master and one slave
+        role: [master, slave]
 
     steps:
       - name: Checkout code
@@ -32,7 +32,41 @@ jobs:
           echo "$JMETER_HOME/bin" >> $GITHUB_PATH
         shell: bash
 
-      - name: Configure JMeter Properties
+  start-slave:
+    runs-on: ubuntu-latest
+    needs: setup-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Download and Extract JMeter
+        run: |
+          wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.5.tgz -O jmeter.tgz
+          tar -xzf jmeter.tgz
+        shell: bash
+
+      - name: Set JMeter Home and Path
+        run: |
+          export JMETER_HOME=$(pwd)/apache-jmeter-5.5
+          echo "JMETER_HOME=$JMETER_HOME" >> $GITHUB_ENV
+          echo "$JMETER_HOME/bin" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Terminate Orphan Processes
+        run: |
+          echo "Terminating orphan processes"
+          pkill -f jmeter-server || echo "No orphan jmeter-server processes found"
+          pkill -f jmeter || echo "No orphan jmeter processes found"
+          pkill -f java || echo "No orphan java processes found"
+        shell: bash
+
+      - name: Configure JMeter Slave Properties
         run: |
           echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
           echo "server_port=1099" >> $JMETER_HOME/bin/user.properties
@@ -42,7 +76,6 @@ jobs:
         shell: bash
 
       - name: Start JMeter Server (Slave)
-        if: matrix.role == 'slave'
         run: |
           echo "Starting JMeter in server mode"
           nohup $JMETER_HOME/bin/jmeter-server > jmeter-server.log 2>&1 &
@@ -54,8 +87,33 @@ jobs:
           echo "JMeter Slave started successfully"
         shell: bash
 
+  run-master:
+    runs-on: ubuntu-latest
+    needs: start-slave
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Download and Extract JMeter
+        run: |
+          wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.5.tgz -O jmeter.tgz
+          tar -xzf jmeter.tgz
+        shell: bash
+
+      - name: Set JMeter Home and Path
+        run: |
+          export JMETER_HOME=$(pwd)/apache-jmeter-5.5
+          echo "JMETER_HOME=$JMETER_HOME" >> $GITHUB_ENV
+          echo "$JMETER_HOME/bin" >> $GITHUB_PATH
+        shell: bash
+
       - name: Wait for Slave to Start
-        if: matrix.role == 'master'
         run: |
           echo "Waiting for JMeter Slave to start"
           sleep 60
@@ -66,16 +124,14 @@ jobs:
         shell: bash
 
       - name: Configure JMeter Master
-        if: matrix.role == 'master'
         run: |
           echo "Configuring JMeter Master"
           echo "remote_hosts=127.0.0.1:1099" >> $JMETER_HOME/bin/user.properties
         shell: bash
 
       - name: Run JMeter Test (Master)
-        if: matrix.role == 'master'
         run: |
           echo "Running JMeter Test"
-          $JMETER_HOME/bin/jmeter -n -t path/to/your/test-plan.jmx -R127.0.0.1:1099 -l test-results.jtl
+          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R127.0.0.1:1099 -l test-results.jtl
           cat test-results.jtl
         shell: bash

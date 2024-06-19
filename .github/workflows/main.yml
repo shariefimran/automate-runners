@@ -1,73 +1,52 @@
 name: Distributed Load Testing with JMeter
 
-on:
-  push:
-    branches:
-      - main
+on: [push]
 
 jobs:
-  load-testing:
+  setup-and-test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest]
-
+        node: [1, 2] # Define two nodes: 1 for master and 1 for slave
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Install JMeter
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Download JMeter
         run: |
-          sudo apt-get update
-          sudo apt-get install -y openjdk-11-jdk
-          curl -L https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-latest.zip -o jmeter.zip
-          unzip jmeter.zip
-          rm jmeter.zip
-          JMETER_VERSION=$(unzip -c jmeter.zip | grep "apache-jmeter-" | cut -d" " -f6 | cut -d"/" -f2)
-          echo "JMeter version: $JMETER_VERSION"
-          cd apache-jmeter-$JMETER_VERSION
+          curl -L https://downloads.apache.org//jmeter/binaries/apache-jmeter-5.5.tgz > jmeter.tgz
+          tar -xzf jmeter.tgz
+          export JMETER_HOME=$(pwd)/apache-jmeter-5.5
+          export PATH=$JMETER_HOME/bin:$PATH
+
+      - name: Configure JMeter Slave
+        if: matrix.node == 2
+        run: |
+          echo "Configuring JMeter Slave"
+          echo "slave.runs-on=ubuntu-latest" > user.properties
+
+      - name: Start JMeter Server (Slave)
+        if: matrix.node == 2
+        run: |
+          echo "Starting JMeter in server mode"
+          nohup jmeter-server &
 
       - name: Configure JMeter Master
+        if: matrix.node == 1
         run: |
-         ./bin/jmeter -n -t test.jmx -l log.jtl -R${{ github.run_id }}-master
+          echo "Configuring JMeter Master"
+          echo "remote_hosts=127.0.0.1" > $JMETER_HOME/bin/user.properties
+          echo "client.runs-on=ubuntu-latest" >> $JMETER_HOME/bin/user.properties
 
-      - name: Launch JMeter Slaves
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ github.run_id }}-slave-1
-          username: ubuntu
-          password: ${{ secrets.UBUNTU_PASSWORD }}
-          script: |
-            cd apache-jmeter-${JMETER_VERSION}
-             ./bin/jmeter -n -t test.jmx -l log.jtl -R${{ github.run_id }}-slave-1
-
-      - name: Launch JMeter Slaves
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ github.run_id }}-slave-2
-          username: ubuntu
-          password: ${{ secrets.UBUNTU_PASSWORD }}
-          script: |
-            cd apache-jmeter-${JMETER_VERSION}
-              ./bin/jmeter -n -t test.jmx -l log.jtl -R${{ github.run_id }}-slave-2
-
-      - name: Wait for Slaves to Finish
+      - name: Run JMeter Test (Master)
+        if: matrix.node == 1
         run: |
-          sleep 300
-
-      - name: Stop JMeter Master
-        run: |
-          cd apache-jmeter-${JMETER_VERSION}
-          ./bin/jmeter -n -t test.jmx -l log.jtl -s
-
-      - name: Collect Results
-        run: |
-          mkdir results
-          cp log.jtl results/
-          tar -czf results.tar.gz results
-
-      - name: Upload Results
-        uses: actions/upload-artifact@v2
-        with:
-          name: results
-          path: results.tar.gz
+          echo "Running JMeter Test"
+          jmeter -n -t Demo.jmx -R127.0.0.1 -l test-results.jtl
+          cat test-results.jtl

@@ -32,11 +32,10 @@ jobs:
           echo "$JMETER_HOME/bin" >> $GITHUB_PATH
         shell: bash
 
-      - name: Configure JMeter Slave
-        if: matrix.role == 'slave'
+      - name: Configure JMeter Properties
         run: |
-          echo "Configuring JMeter Slave"
-          echo "server.rmi.ssl.disable=true" > $JMETER_HOME/bin/user.properties
+          echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
+          echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/system.properties
         shell: bash
 
       - name: Start JMeter Server (Slave)
@@ -60,7 +59,8 @@ jobs:
         if: matrix.role == 'master'
         run: |
           echo "Configuring JMeter Master"
-          echo "remote_hosts=127.0.0.1" > $JMETER_HOME/bin/user.properties
+          echo "remote_hosts=127.0.0.1" >> $JMETER_HOME/bin/user.properties
+          echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/system.properties
         shell: bash
 
       - name: Run JMeter Test (Master)

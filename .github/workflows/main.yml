@@ -76,6 +76,6 @@ jobs:
         if: matrix.role == 'master'
         run: |
           echo "Running JMeter Test"
-          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R127.0.0.1:1099 -l test-results.jtl
+          $JMETER_HOME/bin/jmeter -n -t path/to/your/test-plan.jmx -R127.0.0.1:1099 -l test-results.jtl
           cat test-results.jtl
         shell: bash

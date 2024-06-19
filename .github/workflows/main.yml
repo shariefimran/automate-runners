@@ -35,6 +35,10 @@ jobs:
       - name: Configure JMeter Properties
         run: |
           echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
+          echo "server_port=1099" >> $JMETER_HOME/bin/user.properties
+          echo "client.rmi.localport=50000" >> $JMETER_HOME/bin/user.properties
+          echo "server.rmi.localport=50000" >> $JMETER_HOME/bin/user.properties
+          echo "server.rmi.port=1099" >> $JMETER_HOME/bin/user.properties
         shell: bash
 
       - name: Start JMeter Server (Slave)
@@ -46,7 +50,7 @@ jobs:
           echo "JMeter Server Log:"
           cat jmeter-server.log
           echo "Checking if JMeter Slave is running"
-          pgrep -f jmeter-server || (echo "JMeter Slave failed to start" && exit 1)
+          pgrep -f jmeter-server || (echo "JMeter Slave failed to start" && cat jmeter-server.log && exit 1)
           echo "JMeter Slave started successfully"
         shell: bash
 
@@ -65,13 +69,13 @@ jobs:
         if: matrix.role == 'master'
         run: |
           echo "Configuring JMeter Master"
-          echo "remote_hosts=127.0.0.1" >> $JMETER_HOME/bin/user.properties
+          echo "remote_hosts=127.0.0.1:1099" >> $JMETER_HOME/bin/user.properties
         shell: bash
 
       - name: Run JMeter Test (Master)
         if: matrix.role == 'master'
         run: |
           echo "Running JMeter Test"
-          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R127.0.0.1 -l test-results.jtl
+          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R127.0.0.1:1099 -l test-results.jtl
           cat test-results.jtl
         shell: bash

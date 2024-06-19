@@ -27,7 +27,6 @@ jobs:
 
       - name: Set JMeter Home and Path
         run: |
-          echo "Setting JMETER_HOME and PATH"
           export JMETER_HOME=$(pwd)/apache-jmeter-5.5
           echo "JMETER_HOME=$JMETER_HOME" >> $GITHUB_ENV
           echo "$JMETER_HOME/bin" >> $GITHUB_PATH
@@ -45,7 +44,9 @@ jobs:
         run: |
           echo "Starting JMeter in server mode"
           nohup $JMETER_HOME/bin/jmeter-server > jmeter-server.log 2>&1 &
-          echo "JMeter Slave started"
+          sleep 10
+          echo "Checking if JMeter Slave is running"
+          pgrep -f jmeter-server || (echo "JMeter Slave failed to start" && exit 1)
         shell: bash
 
       - name: Wait for Slave to Start

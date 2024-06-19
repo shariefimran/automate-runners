@@ -1,91 +1,73 @@
+name: Distributed Load Testing with JMeter
 
-name: Distributed JMeter Load Testing
-
-on: 
+on:
   push:
     branches:
       - main
-  pull_request:
 
 jobs:
-  setup-slaves:
+  load-testing:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        slave: [1, 2, 3, 4]  # Number of slave instances you want to run
+        os: [ubuntu-latest]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Install JMeter
         run: |
           sudo apt-get update
-          sudo apt-get install -y openjdk-11-jre
-          wget https://downloads.apache.org//jmeter/binaries/apache-jmeter-5.5.tgz
-          tar -xzf apache-jmeter-5.5.tgz
-          export JMETER_HOME=$PWD/apache-jmeter-5.5
-          export PATH=$PATH:$JMETER_HOME/bin
-
-      - name: Setup JMeter Slave
-        run: |
-          echo "Setting up JMeter slave runner-${{ matrix.slave }}"
-          nohup jmeter-server -Dserver.rmi.localport=50000 -Dserver_port=1099 > slave-${{ matrix.slave }}.log 2>&1 &
-
-  setup-master:
-    runs-on: ubuntu-latest
-    needs: setup-slaves
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Install JMeter
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y openjdk-11-jre
-          wget https://downloads.apache.org//jmeter/binaries/apache-jmeter-5.5.tgz
-          tar -xzf apache-jmeter-5.5.tgz
-          export JMETER_HOME=$PWD/apache-jmeter-5.5
-          export PATH=$PATH:$JMETER_HOME/bin
+          sudo apt-get install -y openjdk-11-jdk
+          curl -L https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-latest.zip -o jmeter.zip
+          unzip jmeter.zip
+          rm jmeter.zip
+          JMETER_VERSION=$(unzip -c jmeter.zip | grep "apache-jmeter-" | cut -d" " -f6 | cut -d"/" -f2)
+          echo "JMeter version: $JMETER_VERSION"
+          cd apache-jmeter-$JMETER_VERSION
 
       - name: Configure JMeter Master
         run: |
-          echo "Setting up JMeter master runner"
-          # Create a properties file to configure the slaves
-          echo "remote_hosts=$(for i in {1..4}; do echo runner-$i; done | paste -sd, -)" > $JMETER_HOME/bin/user.properties
+         ./bin/jmeter -n -t test.jmx -l log.jtl -R${{ github.run_id }}-master
 
-  run-load-test:
-    runs-on: ubuntu-latest
-    needs: setup-master
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Run JMeter Load Test
-        run: |
-          export JMETER_HOME=$PWD/apache-jmeter-5.5
-          export PATH=$PATH:$JMETER_HOME/bin
-          echo "Running JMeter load test"
-          jmeter -n -t Demo.jmx -r
-
-  collect-results:
-    runs-on: ubuntu-latest
-    needs: run-load-test
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Collect JMeter Load Test Results
-        run: |
-          echo "Collecting results"
-          mkdir -p results
-          mv $JMETER_HOME/bin/*.jtl results/
-
-      - name: Upload JMeter Load Test Results
-        uses: actions/upload-artifact@v3
+      - name: Launch JMeter Slaves
+        uses: appleboy/ssh-action@v1
         with:
-          name: load-test-results
-          path: ./results
+          host: ${{ github.run_id }}-slave-1
+          username: ubuntu
+          password: ${{ secrets.UBUNTU_PASSWORD }}
+          script: |
+            cd apache-jmeter-${JMETER_VERSION}
+             ./bin/jmeter -n -t test.jmx -l log.jtl -R${{ github.run_id }}-slave-1
+
+      - name: Launch JMeter Slaves
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ github.run_id }}-slave-2
+          username: ubuntu
+          password: ${{ secrets.UBUNTU_PASSWORD }}
+          script: |
+            cd apache-jmeter-${JMETER_VERSION}
+              ./bin/jmeter -n -t test.jmx -l log.jtl -R${{ github.run_id }}-slave-2
+
+      - name: Wait for Slaves to Finish
+        run: |
+          sleep 300
+
+      - name: Stop JMeter Master
+        run: |
+          cd apache-jmeter-${JMETER_VERSION}
+          ./bin/jmeter -n -t test.jmx -l log.jtl -s
+
+      - name: Collect Results
+        run: |
+          mkdir results
+          cp log.jtl results/
+          tar -czf results.tar.gz results
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v2
+        with:
+          name: results
+          path: results.tar.gz

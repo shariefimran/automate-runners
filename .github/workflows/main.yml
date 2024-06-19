@@ -20,7 +20,7 @@ jobs:
 
       - name: Download JMeter
         run: |
-          curl -L https://downloads.apache.org//jmeter/binaries/apache-jmeter-5.5.tgz -o jmeter.tgz
+          wget https://downloads.apache.org/jmeter/binaries/apache-jmeter-5.5.tgz -O jmeter.tgz
           tar -xzf jmeter.tgz
           export JMETER_HOME=$(pwd)/apache-jmeter-5.5
           export PATH=$JMETER_HOME/bin:$PATH
@@ -29,13 +29,13 @@ jobs:
         if: matrix.role == 'slave'
         run: |
           echo "Configuring JMeter Slave"
-          echo "slave.runs-on=ubuntu-latest" > $JMETER_HOME/bin/user.properties
+          echo "server.rmi.ssl.disable=true" > $JMETER_HOME/bin/user.properties
 
       - name: Start JMeter Server (Slave)
         if: matrix.role == 'slave'
         run: |
           echo "Starting JMeter in server mode"
-          nohup $JMETER_HOME/bin/jmeter-server &
+          nohup $JMETER_HOME/bin/jmeter-server > jmeter-server.log 2>&1 &
 
       - name: Configure JMeter Master
         if: matrix.role == 'master'
